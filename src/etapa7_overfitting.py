@@ -1,0 +1,92 @@
+"""
+Pipeline Completo de Machine Learning — Trabalho de IA/ML
+Dataset: Pima Indians Diabetes (UCI / OpenML)
+Autor: Cientista de Dados Sênior
+"""
+import sys
+if sys.platform.startswith('win'):
+    sys.stdout.reconfigure(encoding='utf-8')
+import warnings 
+warnings.filterwarnings("ignore")
+import numpy as np
+import pandas as pd
+import matplotlib
+matplotlib.use("Agg")          # backend não-interativo
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy import stats
+from sklearn.datasets import fetch_openml
+
+def run_etapa_7(state):
+    globals().update(state)
+    # ================= ETAPA 7 — Regularização e Análise de Overfitting =================
+    print("\n" + "="*60)
+    print("[INFO] Iniciando ETAPA 7 — Regularização e Análise de Overfitting...")
+    print("="*60)
+    # -------------------------------------------------------
+    # 7.1 Forçando Overfitting
+    print("  -> Executando passo: 7.1 Forçando Overfitting")
+    # -------------------------------------------------------
+    # Para forçar o overfitting na MLP do scikit-learn:
+    # Usaremos uma rede muito densa, muitas épocas, alpha=0 (sem L2) e uma "artimanha"
+    # com early_stopping=True mas paciência extrema (n_iter_no_change=500), 
+    # apenas para que o sklearn seja obrigado a capturar e preencher a variável
+    # `validation_scores_` ao longo das épocas (útil para plotarmos o gráfico do descolamento).
+    mlp_overfit = MLPClassifier(
+        hidden_layer_sizes=(256, 128, 64),
+        activation='relu',
+        solver='adam',
+        alpha=0.0,             # Sem regularização
+        max_iter=500,
+        early_stopping=True,
+        validation_fraction=0.2,
+        n_iter_no_change=500,  # "Desliga" o early stopping na prática
+        random_state=42
+    )
+    mlp_overfit.fit(X_train, y_train)
+    # -------------------------------------------------------
+    # 7.2 Aplicando Regularização
+    print("  -> Executando passo: 7.2 Aplicando Regularização")
+    # -------------------------------------------------------
+    mlp_reg = MLPClassifier(
+        hidden_layer_sizes=(64, 32), # Regularização estrutural (rede menor)
+        activation='relu',
+        solver='adam',
+        alpha=0.01,            # Forte regularização L2
+        max_iter=500,
+        early_stopping=True,
+        validation_fraction=0.2,
+        n_iter_no_change=15,   # Early Stopping ativado e agressivo
+        random_state=42
+    )
+    mlp_reg.fit(X_train, y_train)
+    # -------------------------------------------------------
+    # 7.3 Visualização Comparativa
+    print("  -> Executando passo: 7.3 Visualização Comparativa")
+    # -------------------------------------------------------
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    # Plot Overfitting
+    # Convertemos Loss (que tende a 0) em (1 - Loss) só para ficar na mesma
+    # escala visual (ascendente) do Validation Score (Acurácia que tende a 1)
+    loss_overfit_inv = 1 - np.array(mlp_overfit.loss_curve_)
+    axes[0].plot(mlp_overfit.validation_scores_, label='Acurácia (Validação)', color='red', linewidth=2)
+    axes[0].plot(loss_overfit_inv, label='1 - Loss (Treino)', color='blue', linestyle='--', linewidth=2)
+    axes[0].set_title('Modelo com Overfitting', fontsize=14)
+    axes[0].set_xlabel('Épocas')
+    axes[0].set_ylabel('Performance (escala ajustada)')
+    axes[0].legend()
+    axes[0].grid(True, linestyle=':', alpha=0.6)
+    # Plot Regularizado
+    loss_reg_inv = 1 - np.array(mlp_reg.loss_curve_)
+    axes[1].plot(mlp_reg.validation_scores_, label='Acurácia (Validação)', color='green', linewidth=2)
+    axes[1].plot(loss_reg_inv, label='1 - Loss (Treino)', color='blue', linestyle='--', linewidth=2)
+    axes[1].set_title('Modelo Regularizado', fontsize=14)
+    axes[1].set_xlabel('Épocas')
+    axes[1].legend()
+    axes[1].grid(True, linestyle=':', alpha=0.6)
+    plt.tight_layout()
+    plt.savefig(f"{OUTPUT_DIR}/22_overfitting_comparacao.png", dpi=150, bbox_inches="tight")
+    plt.close()
+    # A discussão teórica foi movida para o arquivo discussao.md
+    state.update(locals())
+    return state
