@@ -63,6 +63,30 @@ def run_etapa_7(state):
     )
     mlp_reg.fit(X_train, y_train)
     # -------------------------------------------------------
+    # 7.2.1 Métricas comparativas no conjunto de teste
+    # -------------------------------------------------------
+    from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
+    # Modelo SEM regularização (overfitting)
+    y_pred_overfit = mlp_overfit.predict(X_test)
+    y_prob_overfit = mlp_overfit.predict_proba(X_test)[:, 1]
+    acc_overfit = accuracy_score(y_test, y_pred_overfit)
+    f1_overfit = f1_score(y_test, y_pred_overfit)
+    auc_overfit = roc_auc_score(y_test, y_prob_overfit)
+    # Modelo COM regularização
+    y_pred_regularizado = mlp_reg.predict(X_test)
+    y_prob_regularizado = mlp_reg.predict_proba(X_test)[:, 1]
+    acc_regularizado = accuracy_score(y_test, y_pred_regularizado)
+    f1_regularizado = f1_score(y_test, y_pred_regularizado)
+    auc_regularizado = roc_auc_score(y_test, y_prob_regularizado)
+    # Salvar comparação em arquivo para o relatório
+    with open(f"{OUTPUT_DIR}/metricas_overfitting.md", "w", encoding="utf-8") as f:
+        f.write("# Comparação — Sem Regularização vs Com Regularização (Etapa 7)\n\n")
+        f.write("| Métrica | Sem Regularização | Com Regularização | Delta |\n")
+        f.write("|---|---|---|---|\n")
+        f.write(f"| Accuracy | {acc_overfit:.4f} | {acc_regularizado:.4f} | {acc_regularizado - acc_overfit:+.4f} |\n")
+        f.write(f"| F1-Score | {f1_overfit:.4f} | {f1_regularizado:.4f} | {f1_regularizado - f1_overfit:+.4f} |\n")
+        f.write(f"| ROC-AUC | {auc_overfit:.4f} | {auc_regularizado:.4f} | {auc_regularizado - auc_overfit:+.4f} |\n")
+    # -------------------------------------------------------
     # 7.3 Visualização Comparativa
     print("  -> Executando passo: 7.3 Visualização Comparativa")
     # -------------------------------------------------------

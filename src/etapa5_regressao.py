@@ -72,6 +72,14 @@ def run_etapa_5(state):
     mse = mean_squared_error(y_test_reg, y_pred_reg)
     rmse = np.sqrt(mse)
     r2 = r2_score(y_test_reg, y_pred_reg)
+    # Salvar métricas em arquivo para o relatório
+    with open(f"{OUTPUT_DIR}/metricas_regressao.md", "w", encoding="utf-8") as f:
+        f.write("# Métricas de Regressão — MLP (Etapa 5)\n\n")
+        f.write(f"| Métrica | Valor |\n|---|---|\n")
+        f.write(f"| MAE | {mae:.4f} |\n")
+        f.write(f"| MSE | {mse:.4f} |\n")
+        f.write(f"| RMSE | {rmse:.4f} |\n")
+        f.write(f"| R² | {r2:.4f} |\n")
     # -------------------------------------------------------
     # 5.4 Visualizações
     print("  -> Executando passo: 5.4 Visualizações")

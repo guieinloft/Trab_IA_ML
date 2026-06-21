@@ -95,6 +95,21 @@ def run_etapa_6(state):
     y_prob_best = best_mlp.predict_proba(X_test)[:, 1]
     auc_best = roc_auc_score(y_test, y_prob_best)
     delta_auc = auc_best - auc_mlp
+    # Salvar resultados do Optuna em arquivo para o relatório
+    with open(f"{OUTPUT_DIR}/resultados_optuna.md", "w", encoding="utf-8") as f:
+        f.write("# Resultados da Otimização — Optuna (Etapa 6)\n\n")
+        f.write(f"- **Nº de trials:** {N_TRIALS}\n")
+        f.write(f"- **Tempo de otimização:** {time_opt:.1f}s\n")
+        f.write(f"- **Melhor ROC-AUC (CV):** {best_score:.4f}\n\n")
+        f.write("## Melhores Hiperparâmetros\n\n")
+        f.write("| Hiperparâmetro | Valor |\n|---|---|\n")
+        for k, v in best_params.items():
+            f.write(f"| {k} | {v} |\n")
+        f.write(f"\n## Comparação com Modelo Original\n\n")
+        f.write(f"| Modelo | ROC-AUC (teste) |\n|---|---|\n")
+        f.write(f"| MLP Original | {auc_mlp:.4f} |\n")
+        f.write(f"| MLP Otimizada | {auc_best:.4f} |\n")
+        f.write(f"| **Delta** | **{delta_auc:+.4f}** |\n")
     # -------------------------------------------------------
     # 6.4 Visualizações do Optuna
     print("  -> Executando passo: 6.4 Visualizações do Optuna")
