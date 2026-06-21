@@ -23,6 +23,7 @@ from etapa1_exploracao import run_etapa_1
 from etapa2_preprocessamento import run_etapa_2
 from etapa3_selecao import run_etapa_3
 from etapa4_classificacao import run_etapa_4
+from etapa4b_classificacao_multiclasse import run_etapa_4b
 from etapa5_regressao import run_etapa_5
 from etapa6_otimizacao import run_etapa_6
 from etapa7_overfitting import run_etapa_7
@@ -34,6 +35,7 @@ if __name__ == "__main__":
     state = run_etapa_2(state)
     state = run_etapa_3(state)
     state = run_etapa_4(state)
+    state = run_etapa_4b(state)
     state = run_etapa_5(state)
     state = run_etapa_6(state)
     state = run_etapa_7(state)
