@@ -21,6 +21,17 @@ from sklearn.datasets import fetch_openml
 
 def run_etapa_6(state):
     globals().update(state)
+    X_clf_sel = state.get("X_clf_sel")
+    y_clf_full = state.get("y_clf_full")
+    X_train = state.get("X_train")
+    y_train = state.get("y_train")
+    X_test = state.get("X_test")
+    y_test = state.get("y_test")
+    auc_mlp = state.get("auc_mlp")
+    OUTPUT_DIR = state.get("OUTPUT_DIR")
+    import time
+    from sklearn.neural_network import MLPClassifier
+    from sklearn.metrics import roc_auc_score
     # ================= ETAPA 6 — Otimização de Hiperparâmetros com Optuna =================
     print("\n" + "="*60)
     print("[INFO] Iniciando ETAPA 6 — Otimização de Hiperparâmetros com Optuna...")

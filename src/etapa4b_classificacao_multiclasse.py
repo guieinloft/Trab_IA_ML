@@ -24,6 +24,10 @@ from sklearn.datasets import fetch_openml
 
 def run_etapa_4b(state):
     globals().update(state)
+    df_pre_scaling = state.get("df_pre_scaling")
+    TARGET_REG = state.get("TARGET_REG")
+    df = state.get("df")
+    OUTPUT_DIR = state.get("OUTPUT_DIR")
     # ================= ETAPA 4b — Classificação Multiclasse com MLP =================
     print("\n" + "="*60)
     print("[INFO] Iniciando ETAPA 4b — Classificação Multiclasse com MLP...")

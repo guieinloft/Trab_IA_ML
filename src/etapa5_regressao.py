@@ -21,6 +21,12 @@ from sklearn.datasets import fetch_openml
 
 def run_etapa_5(state):
     globals().update(state)
+    df = state.get("df")
+    TARGET_REG = state.get("TARGET_REG")
+    df_pre_scaling = state.get("df_pre_scaling")
+    OUTPUT_DIR = state.get("OUTPUT_DIR")
+    import time
+    from sklearn.model_selection import train_test_split
     # ================= ETAPA 5 — Regressão com MLP =================
     print("\n" + "="*60)
     print("[INFO] Iniciando ETAPA 5 — Regressão com MLP...")

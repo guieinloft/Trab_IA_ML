@@ -21,6 +21,12 @@ from sklearn.datasets import fetch_openml
 
 def run_etapa_7(state):
     globals().update(state)
+    X_train = state.get("X_train")
+    y_train = state.get("y_train")
+    X_test = state.get("X_test")
+    y_test = state.get("y_test")
+    OUTPUT_DIR = state.get("OUTPUT_DIR")
+    from sklearn.neural_network import MLPClassifier
     # ================= ETAPA 7 — Regularização e Análise de Overfitting =================
     print("\n" + "="*60)
     print("[INFO] Iniciando ETAPA 7 — Regularização e Análise de Overfitting...")
