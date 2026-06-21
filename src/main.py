@@ -1545,3 +1545,295 @@ print(f"  ✓ {OUTPUT_DIR}/19_mlp_regressao_avaliacao.png")
 print("\n" + "=" * 70)
 print("ETAPA 5 CONCLUÍDA COM SUCESSO")
 print("=" * 70)
+
+
+# ================= ETAPA 6 — Otimização de Hiperparâmetros com Optuna =================
+
+import optuna
+from sklearn.model_selection import cross_val_score
+from optuna.visualization.matplotlib import plot_optimization_history, plot_param_importances
+
+print("\n\n" + "=" * 70)
+print("ETAPA 6 — Otimização de Hiperparâmetros com Optuna")
+print("=" * 70)
+
+# -------------------------------------------------------
+# 6.1 Definição do Espaço de Busca e Função Objetivo
+# -------------------------------------------------------
+print("\n" + "-" * 50)
+print("6.1 — Configuração do Optuna")
+print("-" * 50)
+
+# Otimizaremos a MLP de Classificação (Etapa 4)
+# Usaremos as features selecionadas (X_clf_sel) e o target (y_clf_full)
+
+def objective(trial):
+    # Espaço de busca para arquitetura e hiperparâmetros
+    n_layers = trial.suggest_int('n_layers', 1, 3)
+    layers = []
+    for i in range(n_layers):
+        layers.append(trial.suggest_int(f'n_units_l{i}', 16, 128, step=16))
+    
+    learning_rate_init = trial.suggest_float('learning_rate_init', 1e-4, 1e-2, log=True)
+    activation = trial.suggest_categorical('activation', ['relu', 'tanh'])
+    alpha = trial.suggest_float('alpha', 1e-5, 1e-2, log=True) # Penalização L2
+    
+    model = MLPClassifier(
+        hidden_layer_sizes=tuple(layers),
+        activation=activation,
+        learning_rate_init=learning_rate_init,
+        alpha=alpha,
+        solver='adam',
+        max_iter=300,
+        early_stopping=True,
+        random_state=42
+    )
+    
+    # O objetivo é maximizar o ROC-AUC via cross-validation 5-fold
+    score = cross_val_score(model, X_clf_sel, y_clf_full, n_jobs=-1, cv=5, scoring='roc_auc')
+    return score.mean()
+
+print("Espaço de busca configurado:")
+print("  • n_layers: 1 a 3 camadas")
+print("  • n_units (por camada): 16 a 128 neurônios (step=16)")
+print("  • learning_rate_init: 0.0001 a 0.01 (escala log)")
+print("  • activation: 'relu' ou 'tanh'")
+print("  • alpha (Regularização L2): 0.00001 a 0.01 (escala log)")
+
+# -------------------------------------------------------
+# 6.2 Execução da Otimização
+# -------------------------------------------------------
+print("\n" + "-" * 50)
+print("6.2 — Executando os Trials")
+print("-" * 50)
+
+N_TRIALS = 30
+print(f"Iniciando {N_TRIALS} tentativas (trials) do Optuna (por favor aguarde)...")
+
+# Suprimir logs padrão do optuna para um terminal mais limpo
+optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+t0_opt = time.time()
+study = optuna.create_study(direction='maximize', study_name="MLP_Optimization")
+study.optimize(objective, n_trials=N_TRIALS)
+time_opt = time.time() - t0_opt
+
+print(f"Otimização concluída em {time_opt:.2f}s!")
+
+# -------------------------------------------------------
+# 6.3 Resultados e Comparação
+# -------------------------------------------------------
+print("\n" + "-" * 50)
+print("6.3 — Melhores Hiperparâmetros e Comparação")
+print("-" * 50)
+
+best_params = study.best_params
+best_score = study.best_value
+
+print("Melhor conjunto de hiperparâmetros encontrado:")
+for k, v in best_params.items():
+    print(f"  {k}: {v}")
+print(f"\nMelhor ROC-AUC estimada (CV 5-fold): {best_score:.4f}")
+
+# Reconstruir melhor modelo e testar
+layers_best = [best_params[f'n_units_l{i}'] for i in range(best_params['n_layers'])]
+best_mlp = MLPClassifier(
+    hidden_layer_sizes=tuple(layers_best),
+    activation=best_params['activation'],
+    learning_rate_init=best_params['learning_rate_init'],
+    alpha=best_params['alpha'],
+    solver='adam',
+    max_iter=500,
+    early_stopping=True,
+    random_state=42
+)
+
+print("\nTreinando o Melhor Modelo no conjunto de treino completo...")
+t0_best = time.time()
+best_mlp.fit(X_train, y_train)
+time_best = time.time() - t0_best
+
+# Avaliar no conjunto de teste final
+y_prob_best = best_mlp.predict_proba(X_test)[:, 1]
+auc_best = roc_auc_score(y_test, y_prob_best)
+
+print("\n" + "=" * 50)
+print("DISCUSSÃO DOS RESULTADOS (ETAPA 6)")
+print("=" * 50)
+
+print(f"1. Ganhos de desempenho (ROC-AUC no Teste):")
+print(f"   Modelo Original (Etapa 4): {auc_mlp:.4f}")
+print(f"   Modelo Otimizado:          {auc_best:.4f}")
+delta_auc = auc_best - auc_mlp
+print(f"   Variação: {'+' if delta_auc >= 0 else ''}{delta_auc:.4f}")
+
+print(f"\n2. Impacto no tempo de treinamento:")
+print(f"   Tempo Original:  {time_mlp:.3f}s")
+print(f"   Tempo Otimizado: {time_best:.3f}s")
+print("   *Nota: Se a rede otimizada for menor ou usar um learning rate mais rápido, ela convergir mais rápido.*")
+
+print(f"\n3. Principais hiperparâmetros encontrados:")
+print(f"   A arquitetura passou de (64, 32, 16) para {tuple(layers_best)}.")
+print(f"   Função de ativação escolhida: '{best_params['activation']}'.")
+print(f"   Taxa de aprendizado inicial ajustada de 0.001 para {best_params['learning_rate_init']:.5f}.")
+print(f"   Penalidade L2 (alpha) selecionada: {best_params['alpha']:.5f}")
+
+# -------------------------------------------------------
+# 6.4 Visualizações do Optuna
+# -------------------------------------------------------
+print("\n" + "-" * 50)
+print("6.4 — Gerando visualizações do Optuna…")
+print("-" * 50)
+
+# Histórico
+try:
+    ax_hist = plot_optimization_history(study)
+    ax_hist.figure.savefig(f"{OUTPUT_DIR}/20_optuna_history.png", dpi=150, bbox_inches="tight")
+    plt.close(ax_hist.figure)
+    print(f"  ✓ {OUTPUT_DIR}/20_optuna_history.png")
+except Exception as e:
+    print(f"  [Aviso] Falha ao gerar plot_optimization_history: {e}")
+
+# Importância dos Hiperparâmetros
+try:
+    ax_param = plot_param_importances(study)
+    ax_param.figure.tight_layout()
+    ax_param.figure.savefig(f"{OUTPUT_DIR}/21_optuna_param_importances.png", dpi=150, bbox_inches="tight")
+    plt.close(ax_param.figure)
+    print(f"  ✓ {OUTPUT_DIR}/21_optuna_param_importances.png")
+except Exception as e:
+    print(f"  [Aviso] Falha ao gerar plot_param_importances: {e}")
+
+print("\n" + "=" * 70)
+print("ETAPA 6 CONCLUÍDA COM SUCESSO")
+print("=" * 70)
+
+# ================= ETAPA 7 — Regularização e Análise de Overfitting =================
+
+print("\n\n" + "=" * 70)
+print("ETAPA 7 — Regularização e Análise de Overfitting")
+print("=" * 70)
+
+# -------------------------------------------------------
+# 7.1 Forçando Overfitting
+# -------------------------------------------------------
+print("\n" + "-" * 50)
+print("7.1 — Criando modelo propenso a Overfitting")
+print("-" * 50)
+
+# Para forçar o overfitting na MLP do scikit-learn:
+# Usaremos uma rede muito densa, muitas épocas, alpha=0 (sem L2) e uma "artimanha"
+# com early_stopping=True mas paciência extrema (n_iter_no_change=500), 
+# apenas para que o sklearn seja obrigado a capturar e preencher a variável
+# `validation_scores_` ao longo das épocas (útil para plotarmos o gráfico do descolamento).
+
+mlp_overfit = MLPClassifier(
+    hidden_layer_sizes=(256, 128, 64),
+    activation='relu',
+    solver='adam',
+    alpha=0.0,             # Sem regularização
+    max_iter=500,
+    early_stopping=True,
+    validation_fraction=0.2,
+    n_iter_no_change=500,  # "Desliga" o early stopping na prática
+    random_state=42
+)
+
+print("Treinando rede hiperdensa (256, 128, 64) por até 500 épocas (sem regularização L2 e sem parada antecipada real)...")
+mlp_overfit.fit(X_train, y_train)
+print(f"Treino parou na época {mlp_overfit.n_iter_}.")
+
+# -------------------------------------------------------
+# 7.2 Aplicando Regularização
+# -------------------------------------------------------
+print("\n" + "-" * 50)
+print("7.2 — Aplicando Regularização (L2 + Early Stopping)")
+print("-" * 50)
+
+mlp_reg = MLPClassifier(
+    hidden_layer_sizes=(64, 32), # Regularização estrutural (rede menor)
+    activation='relu',
+    solver='adam',
+    alpha=0.01,            # Forte regularização L2
+    max_iter=500,
+    early_stopping=True,
+    validation_fraction=0.2,
+    n_iter_no_change=15,   # Early Stopping ativado e agressivo
+    random_state=42
+)
+
+print("Treinando rede menor (64, 32) com L2 (alpha=0.01) e Early Stopping (paciência=15)...")
+mlp_reg.fit(X_train, y_train)
+print(f"Treino parou na época {mlp_reg.n_iter_}.")
+
+# -------------------------------------------------------
+# 7.3 Visualização Comparativa
+# -------------------------------------------------------
+print("\n" + "-" * 50)
+print("7.3 — Gerando curvas de aprendizado comparativas…")
+print("-" * 50)
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+# Plot Overfitting
+# Convertemos Loss (que tende a 0) em (1 - Loss) só para ficar na mesma
+# escala visual (ascendente) do Validation Score (Acurácia que tende a 1)
+loss_overfit_inv = 1 - np.array(mlp_overfit.loss_curve_)
+axes[0].plot(mlp_overfit.validation_scores_, label='Acurácia (Validação)', color='red', linewidth=2)
+axes[0].plot(loss_overfit_inv, label='1 - Loss (Treino)', color='blue', linestyle='--', linewidth=2)
+axes[0].set_title('Modelo com Overfitting', fontsize=14)
+axes[0].set_xlabel('Épocas')
+axes[0].set_ylabel('Performance (escala ajustada)')
+axes[0].legend()
+axes[0].grid(True, linestyle=':', alpha=0.6)
+
+# Plot Regularizado
+loss_reg_inv = 1 - np.array(mlp_reg.loss_curve_)
+axes[1].plot(mlp_reg.validation_scores_, label='Acurácia (Validação)', color='green', linewidth=2)
+axes[1].plot(loss_reg_inv, label='1 - Loss (Treino)', color='blue', linestyle='--', linewidth=2)
+axes[1].set_title('Modelo Regularizado', fontsize=14)
+axes[1].set_xlabel('Épocas')
+axes[1].legend()
+axes[1].grid(True, linestyle=':', alpha=0.6)
+
+plt.tight_layout()
+plt.savefig(f"{OUTPUT_DIR}/22_overfitting_comparacao.png", dpi=150, bbox_inches="tight")
+plt.close()
+print(f"  ✓ {OUTPUT_DIR}/22_overfitting_comparacao.png")
+
+# -------------------------------------------------------
+# 7.4 Discussão Obrigatória
+# -------------------------------------------------------
+print("\n" + "=" * 50)
+print("DISCUSSÃO TEÓRICA SOBRE OVERFITTING (REQUISITO DA ETAPA 7)")
+print("=" * 50)
+
+print("""
+Q1: Como identificar o overfitting nas curvas de aprendizado?
+R: O overfitting é identificado no gráfico quando a curva de desempenho no conjunto 
+   de treino (linha azul tracejada) continua a subir desenfreadamente (ou a perda cai para 
+   quase zero), enquanto a curva de validação (linha vermelha) estagna e, em seguida, 
+   começa a cair. É esse "descolamento" crescente e a divergência entre treino e teste 
+   que evidenciam que o modelo parou de aprender padrões e passou a decorar os dados.
+
+Q2: Quais os principais impactos do overfitting na capacidade de generalização?
+R: Quando ocorre o overfitting, o modelo se torna superespecializado nos ruídos, 
+   outliers e minúcias exatas do dataset de treinamento. O impacto direto é a perda 
+   da capacidade de generalização: o modelo fracassará em produzir previsões precisas 
+   quando exposto a novos dados do mundo real que não faziam parte do seu treino original.
+
+Q3: Como as técnicas de regularização aplicadas ajudaram a mitigar o problema?
+R: Aplicamos três estratégias conjuntas no modelo da direita (verde) para curar o overfitting:
+   1. Simplificação Estrutural: Reduzimos as camadas de (256, 128, 64) para (64, 32). Menos
+      neurônios significam menor capacidade de memorização "forçada" da rede.
+   2. Regularização L2 (alpha=0.01): Penalizou pesos muito elevados durante o treinamento. 
+      Isso força a rede a usar pesos menores e mais distribuídos, suavizando a fronteira 
+      de decisão matemática.
+   3. Early Stopping: Monitorou a acurácia de validação. Assim que a rede percebeu que não
+      houve melhora durante 15 épocas (paciência), ela congelou o treinamento e "salvou" os
+      pesos, impedindo-a de continuar treinando até decorar os dados residuais.
+""")
+
+print("\n" + "=" * 70)
+print("PROJETO FINALIZADO COM SUCESSO! 🚀")
+print("=" * 70)
