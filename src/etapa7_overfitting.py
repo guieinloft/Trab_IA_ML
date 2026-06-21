@@ -1,7 +1,9 @@
 """
-Pipeline Completo de Machine Learning — Trabalho de IA/ML
+Trabalho de IA/ML - Pipeline de Machine Learning
+Autores: Gabriel Stiegemeier e Guilherme Einloft
+Cadeira: Inteligência Artificial
 Dataset: Pima Indians Diabetes (UCI / OpenML)
-Autor: Cientista de Dados Sênior
+Descrição: Etapa 7 - Análise e controle de overfitting através de regularização L2 na MLP.
 """
 import sys
 if sys.platform.startswith('win'):

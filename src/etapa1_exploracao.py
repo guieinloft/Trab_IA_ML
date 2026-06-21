@@ -1,7 +1,9 @@
 """
-Pipeline Completo de Machine Learning — Trabalho de IA/ML
+Trabalho de IA/ML - Pipeline de Machine Learning
+Autores: Gabriel Stiegemeier e Guilherme Einloft
+Cadeira: Inteligência Artificial
 Dataset: Pima Indians Diabetes (UCI / OpenML)
-Autor: Cientista de Dados Sênior
+Descrição: Etapa 1 - Carga dos dados e análise exploratória inicial.
 """
 import sys
 if sys.platform.startswith('win'):

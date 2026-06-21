@@ -1,7 +1,9 @@
 """
-Pipeline Completo de Machine Learning — Trabalho de IA/ML
+Trabalho de IA/ML - Pipeline de Machine Learning
+Autores: Gabriel Stiegemeier e Guilherme Einloft
+Cadeira: Inteligência Artificial
 Dataset: Pima Indians Diabetes (UCI / OpenML)
-Autor: Cientista de Dados Sênior
+Descrição: Orquestrador principal que executa todas as etapas do pipeline em sequência.
 """
 import sys
 if sys.platform.startswith('win'):
@@ -26,7 +28,7 @@ from etapa6_otimizacao import run_etapa_6
 from etapa7_overfitting import run_etapa_7
 
 if __name__ == "__main__":
-    print("\n🚀 INICIANDO PIPELINE DE MACHINE LEARNING...\n")
+    print("\n INICIANDO PIPELINE DE MACHINE LEARNING...\n")
     state = {}
     state = run_etapa_1(state)
     state = run_etapa_2(state)
@@ -35,4 +37,4 @@ if __name__ == "__main__":
     state = run_etapa_5(state)
     state = run_etapa_6(state)
     state = run_etapa_7(state)
-    print("\n✨ PIPELINE CONCLUÍDO COM SUCESSO! ✨\n")
+    print("\n PIPELINE CONCLUÍDO COM SUCESSO! \n")
