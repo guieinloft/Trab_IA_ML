@@ -27,34 +27,40 @@ def run_etapa_2(state):
     print("="*60)
     from sklearn.impute import KNNImputer
     from sklearn.preprocessing import RobustScaler, StandardScaler
-    # Preservar cópia do DataFrame original para comparações
-    df_original = df.copy()
+    # Receber splits da Etapa 1
+    df_train = state.get("df_train").copy()
+    df_test = state.get("df_test").copy()
+    # Preservar cópias originais para comparações visuais
+    df_train_original = df_train.copy()
     # -------------------------------------------------------
     # 2.1  Tratamento de valores ausentes (zeros inválidos → NaN → imputação)
     # -------------------------------------------------------
     # Passo 1: Substituir zeros biologicamente impossíveis por NaN
     zero_invalid_cols = ["plas", "pres", "skin", "insu", "mass"]
     for col in zero_invalid_cols:
-        n_before = (df[col] == 0).sum()
-        df[col] = df[col].replace(0, np.nan)
-    total_nan = df.isna().sum()
+        df_train[col] = df_train[col].replace(0, np.nan)
+        df_test[col] = df_test[col].replace(0, np.nan)
+    total_nan_train = df_train.isna().sum()
     # Passo 2: Imputação via KNN Imputer (k=5)
     #
-    # - Para as colunas com alta taxa de ausência (insu 48.7%, skin 29.6%), o KNN
-    #   Imputer utiliza as features disponíveis para inferir valores plausíveis.
+    # - IMPORTANTE: o imputer é fit apenas no conjunto de TREINO para evitar
+    #   data leakage. O conjunto de teste é transformado com o imputer já treinado.
     # Separar features e targets antes da imputação
-    features_for_imputation = [c for c in df.columns if c != TARGET_CLF]
+    features_for_imputation = [c for c in df_train.columns if c != TARGET_CLF]
     imputer = KNNImputer(n_neighbors=5, weights="uniform")
-    df[features_for_imputation] = imputer.fit_transform(df[features_for_imputation])
+    df_train[features_for_imputation] = imputer.fit_transform(df_train[features_for_imputation])
+    df_test[features_for_imputation] = imputer.transform(df_test[features_for_imputation])
     # Verificar que não restam NaN
-    nan_after = df.isna().sum().sum()
-    assert nan_after == 0, "Erro: ainda existem valores ausentes!"
-    # Comparar estatísticas antes e depois da imputação
+    nan_after_train = df_train.isna().sum().sum()
+    nan_after_test = df_test.isna().sum().sum()
+    assert nan_after_train == 0, "Erro: ainda existem valores ausentes no treino!"
+    assert nan_after_test == 0, "Erro: ainda existem valores ausentes no teste!"
+    # Comparar estatísticas antes e depois da imputação (apenas treino)
     for col in zero_invalid_cols:
-        mean_before = df_original[col].mean()
-        mean_after = df[col].mean()
-        med_before = df_original[col].median()
-        med_after = df[col].median()
+        mean_before = df_train_original[col].mean()
+        mean_after = df_train[col].mean()
+        med_before = df_train_original[col].median()
+        med_after = df_train[col].median()
     # -------------------------------------------------------
     # 2.2  Codificação de variáveis categóricas
     # -------------------------------------------------------
@@ -69,32 +75,32 @@ def run_etapa_2(state):
     # -------------------------------------------------------
     # 2.3  Escalonamento numérico
     # -------------------------------------------------------
-    #   - insu: 34 outliers (IQR), com distribuição fortemente assimétrica
-    #   - pedi: 29 outliers (IQR), cauda longa à direita
-    #   - mass: 19 outliers (IQR)
-    # O RobustScaler é a escolha mais adequada para preservar a estrutura
-    # dos dados sem que os outliers distorçam a escala das features.
-    # Definir colunas de features (excluindo os dois targets)
-    feature_cols = [c for c in df.columns if c not in [TARGET_CLF]]
-    # Salvar DataFrame pré-escalonamento para visualização
-    df_pre_scaling = df.copy()
-    # Aplicar RobustScaler apenas nas features (não nos targets)
+    #   - IMPORTANTE: o scaler é fit apenas no conjunto de TREINO.
+    #     O conjunto de teste é transformado com o scaler já treinado.
+    # Definir colunas de features (excluindo o target de classificação)
+    feature_cols = [c for c in df_train.columns if c not in [TARGET_CLF]]
+    # Salvar DataFrames pré-escalonamento (imputados mas não escalonados)
+    df_train_pre_scaling = df_train.copy()
+    df_test_pre_scaling = df_test.copy()
+    # Aplicar RobustScaler: fit no TREINO, transform em ambos
     scaler = RobustScaler()
-    df[feature_cols] = scaler.fit_transform(df[feature_cols])
+    df_train[feature_cols] = scaler.fit_transform(df_train[feature_cols])
+    df_test[feature_cols] = scaler.transform(df_test[feature_cols])
     # Estatísticas pós-escalonamento
-    # Demonstrar efeito comparativo: RobustScaler vs StandardScaler
+    # Demonstrar efeito comparativo: RobustScaler vs StandardScaler (apenas no treino)
     std_scaler = StandardScaler()
     df_std = pd.DataFrame(
-        std_scaler.fit_transform(df_pre_scaling[feature_cols]),
+        std_scaler.fit_transform(df_train_pre_scaling[feature_cols]),
         columns=feature_cols
     )
     for col in feature_cols:
-        r_med = df[col].median()
-        r_iqr = df[col].quantile(0.75) - df[col].quantile(0.25)
+        r_med = df_train[col].median()
+        r_iqr = df_train[col].quantile(0.75) - df_train[col].quantile(0.25)
         s_med = df_std[col].median()
         s_iqr = df_std[col].quantile(0.75) - df_std[col].quantile(0.25)
+    print(f"  -> Pré-processamento: treino {len(df_train)}, teste {len(df_test)}")
     # -------------------------------------------------------
-    # 2.4  Visualizações do pré-processamento
+    # 2.4  Visualizações do pré-processamento (usando dados de TREINO)
     # -------------------------------------------------------
     # --- 2.4.1  Antes vs Depois da imputação (distribuições) ---
     fig, axes = plt.subplots(2, 3, figsize=(15, 9))
@@ -102,16 +108,16 @@ def run_etapa_2(state):
     for idx, col in enumerate(zero_invalid_cols):
         ax = axes[idx]
         # Antes (com zeros)
-        ax.hist(df_original[col], bins=30, alpha=0.5, color="#EF5350",
+        ax.hist(df_train_original[col], bins=30, alpha=0.5, color="#EF5350",
                 edgecolor="white", label="Antes (com zeros)", density=True)
         # Depois (imputado)
-        ax.hist(df_pre_scaling[col], bins=30, alpha=0.5, color="#42A5F5",
+        ax.hist(df_train_pre_scaling[col], bins=30, alpha=0.5, color="#42A5F5",
                 edgecolor="white", label="Depois (KNN imputado)", density=True)
         ax.set_title(col, fontsize=12, fontweight="bold")
         ax.set_ylabel("Densidade")
         ax.legend(fontsize=8)
     axes[-1].set_visible(False)
-    fig.suptitle("Distribuições Antes vs Depois da Imputação KNN",
+    fig.suptitle("Distribuições Antes vs Depois da Imputação KNN (Treino)",
                  fontsize=14, fontweight="bold")
     fig.tight_layout()
     fig.savefig(f"{OUTPUT_DIR}/06_imputacao_antes_depois.png", dpi=150, bbox_inches="tight")
@@ -119,7 +125,7 @@ def run_etapa_2(state):
     # --- 2.4.2  Boxplots antes vs depois do escalonamento ---
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
     # Antes
-    bp1 = axes[0].boxplot([df_pre_scaling[c].dropna().values for c in feature_cols],
+    bp1 = axes[0].boxplot([df_train_pre_scaling[c].dropna().values for c in feature_cols],
                            tick_labels=feature_cols, patch_artist=True, vert=True)
     for patch in bp1["boxes"]:
         patch.set_facecolor("#FFCC80")
@@ -128,7 +134,7 @@ def run_etapa_2(state):
     axes[0].set_ylabel("Valor")
     axes[0].tick_params(axis="x", rotation=45)
     # Depois (RobustScaler)
-    bp2 = axes[1].boxplot([df[c].values for c in feature_cols],
+    bp2 = axes[1].boxplot([df_train[c].values for c in feature_cols],
                            tick_labels=feature_cols, patch_artist=True, vert=True)
     for patch in bp2["boxes"]:
         patch.set_facecolor("#81C784")
@@ -136,18 +142,19 @@ def run_etapa_2(state):
     axes[1].set_title("Depois do Escalonamento (RobustScaler)", fontsize=13, fontweight="bold")
     axes[1].set_ylabel("Valor escalonado")
     axes[1].tick_params(axis="x", rotation=45)
-    fig.suptitle("Efeito do Escalonamento nas Features",
+    fig.suptitle("Efeito do Escalonamento nas Features (Treino)",
                  fontsize=14, fontweight="bold")
     fig.tight_layout()
     fig.savefig(f"{OUTPUT_DIR}/07_escalonamento_antes_depois.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
     # --- 2.4.3  Mapa de correlação pós-processamento ---
     fig, ax = plt.subplots(figsize=(10, 8))
-    mask = np.triu(np.ones_like(df.corr(), dtype=bool))
-    sns.heatmap(df.corr().round(2), annot=True, fmt=".2f", cmap="RdBu_r",
+    corr_train = df_train.corr()
+    mask = np.triu(np.ones_like(corr_train, dtype=bool))
+    sns.heatmap(corr_train.round(2), annot=True, fmt=".2f", cmap="RdBu_r",
                 center=0, mask=mask, linewidths=0.5, ax=ax,
                 cbar_kws={"shrink": 0.8})
-    ax.set_title("Matriz de Correlação Pós-Processamento", fontsize=14, fontweight="bold")
+    ax.set_title("Matriz de Correlação Pós-Processamento (Treino)", fontsize=14, fontweight="bold")
     fig.tight_layout()
     fig.savefig(f"{OUTPUT_DIR}/08_correlacao_pos_processamento.png", dpi=150, bbox_inches="tight")
     plt.close(fig)

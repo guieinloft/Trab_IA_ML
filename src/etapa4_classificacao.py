@@ -34,13 +34,16 @@ def run_etapa_4(state):
     # -------------------------------------------------------
     # 4.1  Preparação dos dados (features selecionadas)
     # -------------------------------------------------------
-    # Usar apenas as features selecionadas na Etapa 3
-    X_clf_sel = df[selected_features].copy()
-    y_clf_full = df[TARGET_CLF].copy()
-    # Split treino/teste estratificado (80/20)
-    X_train, X_test, y_train, y_test = train_test_split(
-        X_clf_sel, y_clf_full, test_size=0.2, random_state=42, stratify=y_clf_full
-    )
+    # Usar os splits da Etapa 1 (já pré-processados na Etapa 2)
+    df_train = state.get("df_train")
+    df_test = state.get("df_test")
+    X_train = df_train[selected_features].copy()
+    X_test = df_test[selected_features].copy()
+    y_train = df_train[TARGET_CLF].copy()
+    y_test = df_test[TARGET_CLF].copy()
+    # Para compatibilidade com etapas downstream (CV usa apenas treino)
+    X_clf_sel = X_train.copy()
+    y_clf_full = y_train.copy()
     # -------------------------------------------------------
     # 4.2  Definição e treinamento da MLP
     # -------------------------------------------------------
@@ -229,18 +232,18 @@ def run_etapa_4(state):
     # -------------------------------------------------------
     cv_10 = StratifiedKFold(n_splits=10, shuffle=True, random_state=42)
     scoring_simple = {"accuracy": "accuracy", "f1": "f1", "roc_auc": "roc_auc"}
-    # MLP CV
+    # MLP CV (apenas com dados de TREINO para evitar data leakage)
     t0 = time.time()
     cv_mlp = cross_validate(
         MLPClassifier(**{k: v for k, v in MLP_PARAMS.items()}),
-        X_clf_sel, y_clf_full, cv=cv_10, scoring=scoring_simple, n_jobs=-1
+        X_train, y_train, cv=cv_10, scoring=scoring_simple, n_jobs=-1
     )
     cv_time_mlp = time.time() - t0
     # XGBoost CV
     t0 = time.time()
     cv_xgb = cross_validate(
         XGBClassifier(**xgb_params),
-        X_clf_sel, y_clf_full, cv=cv_10, scoring=scoring_simple, n_jobs=-1
+        X_train, y_train, cv=cv_10, scoring=scoring_simple, n_jobs=-1
     )
     cv_time_xgb = time.time() - t0
     # SVM CV
@@ -248,7 +251,7 @@ def run_etapa_4(state):
     cv_svm = cross_validate(
         SVC(kernel="rbf", C=1.0, gamma="scale", probability=True, random_state=42,
             class_weight="balanced"),
-        X_clf_sel, y_clf_full, cv=cv_10, scoring=scoring_simple, n_jobs=-1
+        X_train, y_train, cv=cv_10, scoring=scoring_simple, n_jobs=-1
     )
     cv_time_svm = time.time() - t0
     for name, cv_res, cv_t in [("MLP", cv_mlp, cv_time_mlp),

@@ -21,12 +21,14 @@ from sklearn.datasets import fetch_openml
 
 def run_etapa_6(state):
     globals().update(state)
-    X_clf_sel = state.get("X_clf_sel")
-    y_clf_full = state.get("y_clf_full")
-    X_train = state.get("X_train")
-    y_train = state.get("y_train")
-    X_test = state.get("X_test")
-    y_test = state.get("y_test")
+    df_train = state.get("df_train")
+    df_test = state.get("df_test")
+    selected_features = state.get("selected_features")
+    TARGET_CLF = state.get("TARGET_CLF")
+    X_train = df_train[selected_features].copy()
+    X_test = df_test[selected_features].copy()
+    y_train = df_train[TARGET_CLF].copy()
+    y_test = df_test[TARGET_CLF].copy()
     auc_mlp = state.get("auc_mlp")
     OUTPUT_DIR = state.get("OUTPUT_DIR")
     import time
@@ -68,7 +70,8 @@ def run_etapa_6(state):
         )
         
         # O objetivo é maximizar o ROC-AUC via cross-validation 5-fold
-        score = cross_val_score(model, X_clf_sel, y_clf_full, n_jobs=-1, cv=5, scoring='roc_auc')
+        # IMPORTANTE: CV feito apenas com dados de TREINO
+        score = cross_val_score(model, X_train, y_train, n_jobs=-1, cv=5, scoring='roc_auc')
         return score.mean()
     # -------------------------------------------------------
     # 6.2 Execução da Otimização
