@@ -103,15 +103,30 @@ A técnica de seleção de atributos empregada foi a Informação Mútua (MI), u
 
 Para estabilizar as estimativas de MI (que dependem de aleatoriedade interna do estimador KNN utilizado pelo scikit-learn), foram executadas 50 rodadas com sementes aleatórias distintas, e os scores finais foram calculados como a média dessas execuções.
 
+Os scores médios de MI obtidos para cada atributo são apresentados na tabela abaixo:
+
+| Rank | Feature | MI médio | Desvio padrão |
+|---|---|---|---|
+| 1 | `plas` | 0,1329 | ±0,0088 |
+| 2 | `insu` | 0,1293 | ±0,0049 |
+| 3 | `mass` | 0,0950 | ±0,0079 |
+| 4 | `age` | 0,0555 | ±0,0180 |
+| 5 | `skin` | 0,0420 | ±0,0123 |
+| 6 | `preg` | 0,0228 | ±0,0153 |
+| 7 | `pres` | 0,0201 | ±0,0164 |
+| 8 | `pedi` | 0,0124 | ±0,0041 |
+
 - **Quantidade inicial de atributos:** 8
-- **Critério de seleção:** Features com MI acima da média geral dos scores (regra do cotovelo adaptada).
-- **Quantidade final de atributos selecionados:** 4
-- **Features selecionadas:** As 4 features que superaram o limiar de MI.
-- **Features descartadas:** As 4 features com MI abaixo do limiar.
+- **Critério de seleção:** Features com MI acima da média geral dos scores (limiar = 0,0638).
+- **Quantidade final de atributos selecionados:** 3
+- **Features selecionadas:** `plas`, `insu`, `mass`
+- **Features descartadas:** `age`, `skin`, `preg`, `pres`, `pedi` (5 features)
 
 #### 2.3.2. Avaliação Comparativa — Todas as Features vs. Features Selecionadas
 
-Para avaliar o impacto da seleção de features, foi treinado um modelo base Random Forest (`n_estimators=100`, `class_weight="balanced"`, `random_state=42`) com validação cruzada estratificada de 10 folds em dois cenários: (a) com todas as 8 features e (b) apenas com as 4 features selecionadas.
+Para avaliar o impacto da seleção de features sem incorrer em *data leakage*, a avaliação comparativa foi implementada com **seleção de features dentro de cada fold da validação cruzada**. Para o cenário com features selecionadas, cada fold calcula a MI exclusivamente sobre os dados de treino do próprio fold, seleciona as features que superam o limiar (MI > média), e treina e avalia o modelo somente com essas features. Os dados de validação do fold nunca influenciam a seleção. Esse procedimento garante que cada predição de validação seja feita com um conjunto de features escolhido sem acesso ao respectivo dado de validação.
+
+O modelo base utilizado foi Random Forest (`n_estimators=100`, `class_weight="balanced"`, `random_state=42`) com validação cruzada estratificada de 10 folds em dois cenários: (a) com todas as 8 features e (b) com features selecionadas por MI dentro de cada fold.
 
 A análise comparativa incluiu os seguintes critérios:
 
@@ -149,7 +164,7 @@ A arquitetura da MLP para classificação binária foi definida com base nos seg
 **Justificativa da arquitetura:**
 
 - **Tamanho do dataset:** 768 amostras é um volume relativamente pequeno para deep learning. Redes muito profundas ou largas causariam overfitting severo rapidamente.
-- **Dimensionalidade:** Com apenas 4 features selecionadas, a capacidade necessária da rede é limitada. Uma rede com 3 camadas ocultas (64 → 32 → 16) oferece flexibilidade suficiente para capturar interações não lineares sem excesso de parâmetros.
+- **Dimensionalidade:** Com apenas 3 features selecionadas (`plas`, `insu`, `mass`), a capacidade necessária da rede é limitada. Uma rede com 3 camadas ocultas (64 → 32 → 16) oferece flexibilidade suficiente para capturar interações não lineares sem excesso de parâmetros.
 - **Pirâmide decrescente:** A redução progressiva de neurônios (64 → 32 → 16) é uma heurística clássica que força a rede a aprender representações cada vez mais compactas, atuando como uma forma de regularização implícita.
 - **Total de parâmetros:** A rede possui aproximadamente 3.500 parâmetros treináveis, mantendo um número muito inferior ao total de amostras de treino para evitar memorização.
 
@@ -300,20 +315,33 @@ A Figura 13 exibe lado a lado os rankings de importância gerados pela Informaç
 
 ![Figura 13 — Comparação dos rankings de importância: Informação Mútua vs. SHAP.](output/13_mi_vs_shap_ranking.png)
 
-A concordância entre os dois métodos foi avaliada por meio da correlação de Spearman entre os rankings. A análise indica que as features consideradas mais relevantes por ambos os métodos apresentam sobreposição, corroborando a seleção realizada pela MI: as técnicas convergem na identificação dos atributos com maior poder preditivo.
+A concordância entre os dois métodos foi avaliada por meio da correlação de Spearman entre os rankings. O coeficiente obtido foi **ρ = 0,9286 (p = 0,0009)**, indicando concordância muito alta e estatisticamente significativa entre os dois métodos. As três features globalmente selecionadas pela MI (`plas`, `insu`, `mass`) pertencem simultaneamente ao topo do ranking SHAP, corroborando a validade da seleção.
 
-#### 3.3.4. Impacto da Seleção de Features
+#### 3.3.4. Impacto da Seleção de Features (MI dentro da CV)
 
-A Figura 14 apresenta a comparação de desempenho entre os modelos treinados com todas as 8 features e apenas com as 4 features selecionadas, utilizando Random Forest com validação cruzada de 10 folds.
+A Figura 14 apresenta a comparação de desempenho entre os dois cenários, com a seleção MI realizada **dentro de cada fold** para garantir ausência de data leakage.
 
 ![Figura 14 — Desempenho comparativo: todas as features vs. features selecionadas (RF, 10-fold CV).](output/14_desempenho_comparativo.png)
 
-A seleção de features demonstrou os seguintes efeitos:
+**Consistência da seleção por fold:** As features `plas`, `insu` e `mass` foram selecionadas em todos os 10 folds (10/10), confirmando que são atributos robustamente relevantes independentemente da partição dos dados. A feature `age` foi selecionada em apenas 2/10 folds, evidenciando que sua relevância é limítrofe e sensível à composição dos dados de treino.
 
-- **Desempenho:** As métricas se mantiveram competitivas mesmo com a redução de 50% dos atributos, indicando que as features descartadas contribuíam com informação redundante ou irrelevante.
-- **Redução de overfitting:** O gap entre acurácia de treino e teste diminuiu no cenário com features selecionadas, indicando melhor generalização.
-- **Tempo de treinamento:** O treinamento com 4 features foi mais rápido do que com 8 features.
-- **Interpretabilidade:** Com metade dos atributos, o modelo resultante é mais facilmente interpretável por profissionais da área de saúde.
+**Métricas comparativas (10-fold CV estratificada):**
+
+| Métrica | Todas (8 feat.) | Selecionadas (3 feat.) | Δ |
+|---|---|---|---|
+| Accuracy | 0,7476 ± 0,0478 | 0,7297 ± 0,0430 | −0,0179 |
+| Precision | 0,6338 ± 0,0729 | 0,6080 ± 0,0634 | −0,0258 |
+| Recall | 0,6636 ± 0,0710 | 0,6500 ± 0,0676 | −0,0136 |
+| F1-Score | 0,6471 ± 0,0658 | 0,6264 ± 0,0539 | −0,0207 |
+| ROC-AUC | 0,8259 ± 0,0488 | 0,7957 ± 0,0380 | −0,0302 |
+
+**Gap de overfitting (acurácia treino − teste):**
+- Todas as features: **0,2521**
+- Features selecionadas: **0,2694**
+
+Os resultados, agora avaliados sem data leakage, revelam um quadro mais realista: o modelo com 3 features selecionadas apresenta desempenho ligeiramente inferior ao modelo com todas as 8 features em todas as métricas. Isso é esperado — a avaliação anterior (com MI calculada fora da CV) inflava artificialmente as métricas do cenário selecionado ao permitir que a escolha das features considerasse os dados de validação. Com a seleção dentro da CV, o resultado é metodologicamente correto.
+
+A diferença de ROC-AUC (−0,0302) e de Accuracy (−0,0179) é pequena em termos absolutos, e o desvio padrão reduzido no cenário selecionado indica maior estabilidade entre os folds. O gap de overfitting ligeiramente maior no cenário selecionado (0,2694 vs 0,2521) sugere que as 3 features, por serem mais informativas, permitem que o Random Forest ajuste-se mais agressivamente ao treino. Ainda assim, a redução de 62,5% no número de atributos (de 8 para 3) com perda de desempenho inferior a 4% em todas as métricas justifica a seleção sob a perspectiva de **interpretabilidade e eficiência computacional**.
 
 ### 3.4. Classificação Binária com MLP (Etapa 4)
 
@@ -472,7 +500,7 @@ Os principais resultados obtidos podem ser sintetizados da seguinte forma:
 
 1. **Pré-processamento:** O KNN Imputer (k=5) e o RobustScaler demonstraram-se adequados para o tratamento do dataset, preservando a estrutura multivariada dos dados e mitigando o impacto de outliers, respectivamente.
 
-2. **Seleção de features:** A Informação Mútua reduziu o conjunto de 8 para 4 atributos sem degradação significativa de desempenho. A análise SHAP corroborou a seleção, com concordância entre os rankings de importância gerados por ambos os métodos.
+2. **Seleção de features:** A Informação Mútua reduziu o conjunto de 8 para 3 atributos (`plas`, `insu`, `mass`). A seleção foi realizada dentro de cada fold da validação cruzada, eliminando o risco de data leakage. As 3 features foram selecionadas em todos os 10 folds. A análise SHAP corroborou a seleção com concordância muito alta (ρ de Spearman = 0,93, p < 0,001), e o modelo com 3 features manteve desempenho competitivo (ROC-AUC 0,80 vs. 0,83 com todas as features).
 
 3. **Classificação binária:** A MLP com arquitetura (64, 32, 16) obteve ROC-AUC de 0,7902 no conjunto de teste, desempenho competitivo frente a modelos clássicos e confirmando a capacidade discriminatória com as variáveis selecionadas.
 

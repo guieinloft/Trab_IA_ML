@@ -66,9 +66,12 @@ def run_etapa_3(state):
     mi_threshold = mi_mean.mean()
     selected_features = mi_ranking[mi_ranking["MI_mean"] > mi_threshold]["Feature"].tolist()
     dropped_features = mi_ranking[mi_ranking["MI_mean"] <= mi_threshold]["Feature"].tolist()
+    # (X_clf_selected é usada apenas para referência visual; a CV abaixo
+    #  recalcula a seleção dentro de cada fold para evitar data leakage.)
     X_clf_selected = X_clf[selected_features]
     # -------------------------------------------------------
     # 3.3  Avaliação comparativa: todas features vs selecionadas
+    #      (seleção MI feita DENTRO de cada fold para evitar data leakage)
     # -------------------------------------------------------
     # Modelo base: Random Forest com hiperparâmetros padrão
     # Usamos random_state fixo para reprodutibilidade
@@ -88,21 +91,73 @@ def run_etapa_3(state):
         "roc_auc": "roc_auc"
     }
     cv = StratifiedKFold(n_splits=10, shuffle=True, random_state=42)
-    # --- Cenário 1: Todas as features ---
+    # --- Cenário 1: Todas as features (sem seleção — cross_validate padrão) ---
     t0 = time.time()
     rf_all = RandomForestClassifier(**rf_params)
     cv_all = cross_validate(rf_all, X_clf, y_clf, cv=cv, scoring=scoring,
                             return_train_score=True, n_jobs=-1)
     time_all = time.time() - t0
-    # --- Cenário 2: Features selecionadas ---
+    # --- Cenário 2: Features selecionadas POR FOLD (MI dentro da CV) ---
+    # Cada fold calcula MI apenas no treino do fold, seleciona features
+    # com MI > média, treina e avalia. Isso elimina o data leakage.
     t0 = time.time()
-    rf_sel = RandomForestClassifier(**rf_params)
-    cv_sel = cross_validate(rf_sel, X_clf_selected, y_clf, cv=cv, scoring=scoring,
-                            return_train_score=True, n_jobs=-1)
+    metric_names = ["accuracy", "precision", "recall", "f1", "roc_auc"]
+    cv_sel_test = {m: [] for m in metric_names}
+    cv_sel_train = {m: [] for m in metric_names}
+    features_per_fold = []  # para inspeção: quais features cada fold escolheu
+    for fold_idx, (train_idx, val_idx) in enumerate(cv.split(X_clf, y_clf)):
+        X_fold_train, X_fold_val = X_clf.iloc[train_idx], X_clf.iloc[val_idx]
+        y_fold_train, y_fold_val = y_clf.iloc[train_idx], y_clf.iloc[val_idx]
+        # Calcular MI apenas no treino do fold
+        mi_fold = np.zeros((n_runs, X_fold_train.shape[1]))
+        for i in range(n_runs):
+            mi_fold[i, :] = mutual_info_classif(
+                X_fold_train, y_fold_train,
+                discrete_features=False, random_state=i
+            )
+        mi_fold_mean = mi_fold.mean(axis=0)
+        mi_fold_threshold = mi_fold_mean.mean()
+        fold_selected = [c for c, m in zip(X_clf.columns, mi_fold_mean)
+                         if m > mi_fold_threshold]
+        # Fallback: se nenhuma feature passar o limiar, usar todas
+        if len(fold_selected) == 0:
+            fold_selected = list(X_clf.columns)
+        features_per_fold.append(fold_selected)
+        # Treinar e avaliar com as features selecionadas neste fold
+        rf_fold = RandomForestClassifier(**rf_params)
+        rf_fold.fit(X_fold_train[fold_selected], y_fold_train)
+        y_pred_val = rf_fold.predict(X_fold_val[fold_selected])
+        y_proba_val = rf_fold.predict_proba(X_fold_val[fold_selected])[:, 1]
+        y_pred_train = rf_fold.predict(X_fold_train[fold_selected])
+        y_proba_train = rf_fold.predict_proba(X_fold_train[fold_selected])[:, 1]
+        # Métricas de teste
+        cv_sel_test["accuracy"].append(accuracy_score(y_fold_val, y_pred_val))
+        cv_sel_test["precision"].append(precision_score(y_fold_val, y_pred_val, zero_division=0))
+        cv_sel_test["recall"].append(recall_score(y_fold_val, y_pred_val, zero_division=0))
+        cv_sel_test["f1"].append(f1_score(y_fold_val, y_pred_val, zero_division=0))
+        cv_sel_test["roc_auc"].append(roc_auc_score(y_fold_val, y_proba_val))
+        # Métricas de treino (para análise de overfitting)
+        cv_sel_train["accuracy"].append(accuracy_score(y_fold_train, y_pred_train))
+        cv_sel_train["precision"].append(precision_score(y_fold_train, y_pred_train, zero_division=0))
+        cv_sel_train["recall"].append(recall_score(y_fold_train, y_pred_train, zero_division=0))
+        cv_sel_train["f1"].append(f1_score(y_fold_train, y_pred_train, zero_division=0))
+        cv_sel_train["roc_auc"].append(roc_auc_score(y_fold_train, y_proba_train))
     time_sel = time.time() - t0
+    # Converter listas em arrays para interface compatível com cross_validate
+    cv_sel = {}
+    for m in metric_names:
+        cv_sel[f"test_{m}"] = np.array(cv_sel_test[m])
+        cv_sel[f"train_{m}"] = np.array(cv_sel_train[m])
+    # Log: consistência de features entre folds
+    from collections import Counter
+    feat_counts = Counter(f for fold in features_per_fold for f in fold)
+    n_folds = len(features_per_fold)
+    print(f"  [MI inside CV] Features selecionadas em todos os {n_folds} folds:")
+    for feat, cnt in feat_counts.most_common():
+        print(f"    {feat}: {cnt}/{n_folds} folds")
     # Exibir resultados comparativos
     results_comparison = {}
-    for metric in ["accuracy", "precision", "recall", "f1", "roc_auc"]:
+    for metric in metric_names:
         mean_all = cv_all[f"test_{metric}"].mean()
         std_all = cv_all[f"test_{metric}"].std()
         mean_sel = cv_sel[f"test_{metric}"].mean()
