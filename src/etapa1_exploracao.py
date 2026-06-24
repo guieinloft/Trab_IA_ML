@@ -175,5 +175,18 @@ def run_etapa_1(state):
     fig.tight_layout()
     fig.savefig(f"{OUTPUT_DIR}/05_distribuicao_classes.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
+    # -------------------------------------------------------
+    # 1.9  Divisão treino/teste (80/20) — ANTES do pré-processamento
+    # -------------------------------------------------------
+    # O split é feito aqui, sobre os dados brutos, para evitar data leakage.
+    # O pré-processamento (imputação, escalonamento) será fit apenas no treino.
+    from sklearn.model_selection import train_test_split
+    df_train, df_test = train_test_split(
+        df, test_size=0.2, random_state=42, stratify=df[TARGET_CLF]
+    )
+    # Resetar índices para evitar problemas de alinhamento
+    df_train = df_train.reset_index(drop=True)
+    df_test = df_test.reset_index(drop=True)
+    print(f"  -> Split treino/teste: {len(df_train)} treino, {len(df_test)} teste")
     state.update(locals())
     return state

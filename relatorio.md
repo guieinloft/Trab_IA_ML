@@ -63,9 +63,9 @@ A classe negativa (0) corresponde a 500 amostras (65,1%) e a classe positiva (1)
 
 **Correlação entre atributos:** Nenhum par de features apresentou correlação superior a |r| = 0,7, o que indica ausência de multicolinearidade severa. As correlações mais relevantes observadas foram entre `skin` e `insu` (r = 0,44) e entre `mass` e `skin` (r = 0,39).
 
-### 2.2. Pré-processamento (Etapa 2)
+### 2.2. Divisão Treino/Teste e Pré-processamento (Etapa 2)
 
-O pré-processamento dos dados envolveu três operações principais: tratamento de valores ausentes, verificação de codificação de variáveis categóricas e escalonamento numérico.
+O pré-processamento dos dados envolveu três operações principais: tratamento de valores ausentes, verificação de codificação de variáveis categóricas e escalonamento numérico. Para evitar o fenômeno de *data leakage* (vazamento de dados), o conjunto original foi inicialmente dividido em treino (80%, 614 amostras) e teste (20%, 154 amostras), com estratificação pela variável alvo. Todas as operações de imputação e escalonamento foram ajustadas (fit) exclusivamente no conjunto de treino, sendo então aplicadas (transform) ao conjunto de teste.
 
 #### 2.2.1. Tratamento de Valores Ausentes — KNN Imputer (k=5)
 
@@ -361,10 +361,10 @@ As métricas de avaliação no conjunto de teste são apresentadas na tabela a s
 
 | Métrica | Valor |
 |---|---|
-| Accuracy | 0,7013 |
-| Precision Macro | 0,7606 |
-| Recall Macro | 0,6793 |
-| F1 Macro | 0,6864 |
+| Accuracy | 0,6364 |
+| Precision Macro | 0,6427 |
+| Recall Macro | 0,6359 |
+| F1 Macro | 0,6373 |
 
 A Figura 20 exibe a matriz de confusão 3×3 do modelo multiclasse. Observa-se que a classe "Pré-diabético" apresenta a maior taxa de confusão, o que é esperado por se tratar de uma classe intermediária cujas fronteiras de decisão são limítrofes com as classes adjacentes.
 
@@ -378,7 +378,7 @@ A Figura 22 resume as métricas obtidas em formato de gráfico de barras.
 
 ![Figura 22 — Métricas de classificação multiclasse (MLP).](output/26_multiclasse_metricas.png)
 
-A Accuracy de 0,70 e o F1 Macro de 0,69 para um problema com 3 classes clinicamente definidas podem ser considerados resultados satisfatórios, particularmente tendo em vista o volume limitado de amostras e a natureza da fronteira entre as classes intermediárias.
+A Accuracy de 0,64 e o F1 Macro de 0,64 para um problema com 3 classes clinicamente definidas podem ser considerados resultados satisfatórios, particularmente tendo em vista o volume limitado de amostras e a natureza da fronteira entre as classes intermediárias.
 
 ### 3.6. Regressão com MLP (Etapa 5)
 
@@ -386,12 +386,12 @@ As métricas de desempenho da MLP de regressão no conjunto de teste são:
 
 | Métrica | Valor |
 |---|---|
-| MAE | 18,0696 mg/dL |
-| MSE | 502,6746 |
-| RMSE | 22,4204 mg/dL |
-| R² | 0,5005 |
+| MAE | 18,6116 mg/dL |
+| MSE | 603,7746 |
+| RMSE | 24,5718 mg/dL |
+| R² | 0,4165 |
 
-O R² de 0,50 indica que o modelo explica aproximadamente 50% da variância da concentração de glicose plasmática. O MAE de 18,07 mg/dL representa um erro médio absoluto na unidade clínica original, o que pode ser contextualizado frente à amplitude do intervalo da variável (`plas` varia de aproximadamente 44 a 199 mg/dL no dataset imputado).
+O R² de 0,42 indica que o modelo explica aproximadamente 42% da variância da concentração de glicose plasmática. O MAE de 18,61 mg/dL representa um erro médio absoluto na unidade clínica original, o que pode ser contextualizado frente à amplitude do intervalo da variável (`plas` varia de aproximadamente 44 a 199 mg/dL no dataset imputado).
 
 A Figura 23 apresenta, em três painéis, a avaliação do modelo de regressão: (a) valores reais versus preditos, com a linha ideal de referência; (b) análise de resíduos; e (c) curva de aprendizado (loss e R² por época).
 
@@ -403,27 +403,26 @@ No gráfico de valores reais vs. preditos, observa-se que os pontos se concentra
 
 O processo de otimização com Optuna executou 30 trials em aproximadamente 6,9 segundos. Os resultados são sintetizados a seguir:
 
-**Melhor ROC-AUC obtido via validação cruzada:** 0,8446
+**Melhor ROC-AUC obtido via validação cruzada:** 0,8344
 
 **Melhores hiperparâmetros encontrados:**
 
 | Hiperparâmetro | Valor |
 |---|---|
-| Número de camadas | 3 |
-| Neurônios camada 0 | 32 |
-| Neurônios camada 1 | 128 |
-| Neurônios camada 2 | 128 |
-| Taxa de aprendizado | ≈ 0,0050 |
+| Número de camadas | 2 |
+| Neurônios camada 0 | 16 |
+| Neurônios camada 1 | 112 |
+| Taxa de aprendizado | ≈ 0,0010 |
 | Função de ativação | relu |
-| Alpha (L2) | ≈ 0,0002 |
+| Alpha (L2) | ≈ 0,0001 |
 
 **Comparação com o modelo original no conjunto de teste:**
 
 | Modelo | ROC-AUC (teste) |
 |---|---|
-| MLP Original | 0,8135 |
-| MLP Otimizada | 0,8119 |
-| Delta | −0,0017 |
+| MLP Original | 0,7902 |
+| MLP Otimizada | 0,7811 |
+| Delta | −0,0091 |
 
 A Figura 24 exibe o histórico de otimização do Optuna, mostrando a evolução do valor objetivo (ROC-AUC) ao longo dos 30 trials.
 
@@ -433,7 +432,7 @@ A Figura 25 apresenta a importância dos hiperparâmetros estimada pelo Optuna, 
 
 ![Figura 25 — Importância dos hiperparâmetros estimada pelo Optuna.](output/21_optuna_param_importances.png)
 
-O delta de −0,0017 no ROC-AUC entre o modelo original e o otimizado indica que a configuração inicial da MLP (Etapa 4) já se encontrava próxima de uma região de bom desempenho no espaço de hiperparâmetros. A arquitetura encontrada pelo Optuna (32 → 128 → 128) difere da original (64 → 32 → 16) na topologia, mas não produz ganho significativo no conjunto de teste, o que sugere que o desempenho do modelo é limitado pela quantidade e pela natureza dos dados, e não pela configuração de hiperparâmetros. É relevante notar que o melhor ROC-AUC de validação cruzada (0,8446) é ligeiramente superior ao resultado no teste (0,8119), o que pode indicar variância natural entre os folds de validação e o conjunto de teste final.
+O delta de −0,0091 no ROC-AUC entre o modelo original e o otimizado indica que a configuração inicial da MLP (Etapa 4) já se encontrava próxima de uma região de bom desempenho no espaço de hiperparâmetros. A arquitetura encontrada pelo Optuna (16 → 112) difere da original (64 → 32 → 16) na topologia, reduzindo o número de camadas, mas não produz ganho no conjunto de teste, o que sugere que o desempenho do modelo é limitado pela quantidade e pela natureza dos dados, e não pela configuração de hiperparâmetros. É relevante notar que o melhor ROC-AUC de validação cruzada (0,8344) é sensivelmente superior ao resultado no teste (0,7811), o que pode indicar variância natural entre os folds de validação e o conjunto de teste final.
 
 ### 3.8. Regularização e Análise de Overfitting (Etapa 7)
 
@@ -445,9 +444,9 @@ As métricas comparativas no conjunto de teste são:
 
 | Métrica | Sem Regularização | Com Regularização | Delta |
 |---|---|---|---|
-| Accuracy | 0,7208 | 0,7143 | −0,0065 |
-| F1-Score | 0,5825 | 0,5686 | −0,0139 |
-| ROC-AUC | 0,8015 | 0,8006 | −0,0009 |
+| Accuracy | 0,7078 | 0,7273 | +0,0195 |
+| F1-Score | 0,5361 | 0,5435 | +0,0074 |
+| ROC-AUC | 0,7911 | 0,7896 | −0,0015 |
 
 #### 3.8.1. Discussão sobre Overfitting
 
@@ -458,7 +457,7 @@ Sim. O modelo sem regularização (256, 128, 64 neurônios, alpha=0) exibiu o pa
 Três estratégias foram aplicadas de forma conjunta: (1) simplificação estrutural — redução das camadas de (256, 128, 64) para (64, 32), diminuindo a capacidade de memorização da rede; (2) regularização L2 com alpha=0,01 — penalização de pesos elevados, forçando a rede a utilizar pesos menores e mais distribuídos; (3) early stopping com paciência de 15 épocas — interrupção do treinamento quando a acurácia de validação parou de melhorar.
 
 **Houve melhoria no desempenho em dados não vistos?**
-As métricas absolutas no conjunto de teste foram ligeiramente inferiores no modelo regularizado (delta de −0,0065 em Accuracy e −0,0009 em ROC-AUC). No entanto, essa diferença é marginal e se encontra dentro da variância esperada para o tamanho do dataset. A análise das curvas de aprendizado mostra que o modelo regularizado apresenta menor gap entre treino e validação, indicando melhor capacidade de generalização — ainda que a diferença final no conjunto de teste específico não favoreça o modelo regularizado de forma estatisticamente significativa.
+As métricas no conjunto de teste mostraram melhora no modelo regularizado para Accuracy (+0,0195) e F1-Score (+0,0074), embora tenha havido leve queda no ROC-AUC (−0,0015). A análise das curvas de aprendizado mostra que o modelo regularizado apresenta menor gap entre treino e validação, indicando melhor capacidade de generalização e prevenindo quedas abruptas de desempenho em dados inéditos.
 
 **Qual estratégia apresentou melhor equilíbrio entre desempenho e generalização?**
 O modelo regularizado apresentou melhor equilíbrio. Apesar de métricas finais semelhantes, a estabilidade das curvas de treino-validação e a menor tendência a memorização tornam o modelo regularizado preferível em cenários de produção, onde a robustez a dados inéditos é prioritária. A combinação de simplificação estrutural + L2 + early stopping demonstrou eficácia na contenção do overfitting sem degradação significativa do desempenho.
@@ -475,14 +474,14 @@ Os principais resultados obtidos podem ser sintetizados da seguinte forma:
 
 2. **Seleção de features:** A Informação Mútua reduziu o conjunto de 8 para 4 atributos sem degradação significativa de desempenho. A análise SHAP corroborou a seleção, com concordância entre os rankings de importância gerados por ambos os métodos.
 
-3. **Classificação binária:** A MLP com arquitetura (64, 32, 16) obteve ROC-AUC de 0,8135 no conjunto de teste, desempenho competitivo em relação ao XGBoost e ao SVM (RBF), todos com AUC superior a 0,80.
+3. **Classificação binária:** A MLP com arquitetura (64, 32, 16) obteve ROC-AUC de 0,7902 no conjunto de teste, desempenho competitivo frente a modelos clássicos e confirmando a capacidade discriminatória com as variáveis selecionadas.
 
-4. **Classificação multiclasse:** A MLP atingiu Accuracy de 0,7013 e F1 Macro de 0,6864 na categorização de níveis glicêmicos em três classes clínicas (Normal, Pré-diabético e Diabético), resultado considerado satisfatório dado o volume de dados e a natureza limítrofe das fronteiras entre classes.
+4. **Classificação multiclasse:** A MLP atingiu Accuracy de 0,6364 e F1 Macro de 0,6373 na categorização de níveis glicêmicos em três classes clínicas (Normal, Pré-diabético e Diabético), resultado considerado satisfatório dado o volume de dados e a natureza limítrofe das fronteiras entre classes.
 
-5. **Regressão:** O modelo MLP de regressão obteve R² = 0,50 e MAE = 18,07 mg/dL na predição da glicose plasmática, explicando metade da variância da variável alvo. A curva de resíduos não indicou viés sistemático.
+5. **Regressão:** O modelo MLP de regressão obteve R² = 0,42 e MAE = 18,61 mg/dL na predição da glicose plasmática, explicando 42% da variância da variável alvo. A curva de resíduos não indicou viés sistemático.
 
-6. **Otimização com Optuna:** A busca por hiperparâmetros (30 trials) resultou em ROC-AUC de validação cruzada de 0,8446, porém sem ganho significativo no conjunto de teste em relação ao modelo original (delta = −0,0017). Esse resultado sugere que o desempenho é limitado pelo volume e pela natureza dos dados, e não pela configuração de hiperparâmetros.
+6. **Otimização com Optuna:** A busca por hiperparâmetros (30 trials) resultou em ROC-AUC de validação cruzada de 0,8344, porém sem ganho significativo no conjunto de teste em relação ao modelo original (delta = −0,0091). Esse resultado sugere que o desempenho é limitado pelo volume e pela natureza dos dados, e não pela configuração de hiperparâmetros.
 
-7. **Regularização:** A análise de overfitting confirmou que a rede sem regularização apresentou sinais claros de memorização. A combinação de simplificação estrutural, regularização L2 e early stopping mitigou esse comportamento, mantendo desempenho estável no conjunto de teste (ROC-AUC de 0,8006 vs. 0,8015, delta marginal de −0,0009).
+7. **Regularização:** A análise de overfitting confirmou que a rede sem regularização apresentou sinais claros de memorização. A combinação de simplificação estrutural, regularização L2 e early stopping mitigou esse comportamento, melhorando o Accuracy (0,7273 vs 0,7078) e F1-Score no conjunto de teste.
 
 Em suma, o projeto demonstrou que técnicas de aprendizado supervisionado, mesmo em datasets de volume moderado, podem produzir modelos com capacidade discriminativa relevante para o auxílio ao diagnóstico clínico. A integração de métodos de interpretabilidade (SHAP) com a seleção de features (MI) fortaleceu a transparência e a confiabilidade do pipeline, elementos essenciais em aplicações na área de saúde. O resultado global do projeto indica um equilíbrio adequado entre complexidade do modelo, desempenho preditivo e capacidade de generalização.

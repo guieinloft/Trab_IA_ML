@@ -45,12 +45,25 @@ def run_etapa_4b(state):
     #   - Diabético:      glicose ≥ 140 mg/dL
     #
     # Usamos os valores originais (não escalonados) de 'plas' para aplicar os limiares.
-    glucose_original = df_pre_scaling[TARGET_REG].copy()
-    y_multi = pd.cut(
-        glucose_original,
+    df_train = state.get("df_train")
+    df_test = state.get("df_test")
+    df_train_pre_scaling = state.get("df_train_pre_scaling")
+    df_test_pre_scaling = state.get("df_test_pre_scaling")
+    # Criar targets multiclasse a partir dos valores pré-escalonamento
+    glucose_train = df_train_pre_scaling[TARGET_REG].copy()
+    glucose_test = df_test_pre_scaling[TARGET_REG].copy()
+    y_multi_train = pd.cut(
+        glucose_train,
         bins=[-np.inf, 100, 140, np.inf],
         labels=[0, 1, 2]
     ).astype(int)
+    y_multi_test = pd.cut(
+        glucose_test,
+        bins=[-np.inf, 100, 140, np.inf],
+        labels=[0, 1, 2]
+    ).astype(int)
+    # Para distribuição geral (visualização), combinar ambos
+    y_multi = pd.concat([y_multi_train, y_multi_test], ignore_index=True)
     class_names = ["Normal", "Pré-diabético", "Diabético"]
     dist_multi = y_multi.value_counts().sort_index()
     # -------------------------------------------------------
@@ -59,12 +72,12 @@ def run_etapa_4b(state):
     # Features: todas as colunas do df escalonado, EXCETO 'plas' (que define o target).
     # Nota: 'Outcome' é incluída como feature — ela reflete um diagnóstico independente
     # (baseado em OGTT — Oral Glucose Tolerance Test), diferente da glicose de jejum.
-    features_multi = [c for c in df.columns if c != TARGET_REG]
-    X_multi = df[features_multi].copy()
-    # Split treino/teste estratificado (80/20)
-    X_train_m, X_test_m, y_train_m, y_test_m = train_test_split(
-        X_multi, y_multi, test_size=0.2, random_state=42, stratify=y_multi
-    )
+    features_multi = [c for c in df_train.columns if c != TARGET_REG]
+    # Usar os splits já existentes (sem train_test_split interno)
+    X_train_m = df_train[features_multi].copy()
+    X_test_m = df_test[features_multi].copy()
+    y_train_m = y_multi_train
+    y_test_m = y_multi_test
     # -------------------------------------------------------
     # 4b.3  Definição e treinamento da MLP Multiclasse
     # -------------------------------------------------------

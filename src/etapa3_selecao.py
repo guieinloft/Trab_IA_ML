@@ -33,12 +33,13 @@ def run_etapa_3(state):
     import shap
     import time
     # -------------------------------------------------------
-    # 3.1  Preparação dos dados para classificação
+    # 3.1  Preparação dos dados para classificação (apenas TREINO)
     # -------------------------------------------------------
-    # Features (excluindo target de classificação)
-    # Nota: 'plas' é target de regressão, mas aqui é usada como feature para classificação
-    X_clf = df[feature_cols].copy()
-    y_clf = df[TARGET_CLF].copy()
+    # IMPORTANTE: seleção de features é feita apenas com dados de TREINO
+    # para evitar data leakage.
+    df_train = state.get("df_train")
+    X_clf = df_train[feature_cols].copy()
+    y_clf = df_train[TARGET_CLF].copy()
     # -------------------------------------------------------
     # 3.2  Seleção de Features via Informação Mútua (Método Filtro)
     # -------------------------------------------------------

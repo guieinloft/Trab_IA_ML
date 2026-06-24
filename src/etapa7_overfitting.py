@@ -21,10 +21,14 @@ from sklearn.datasets import fetch_openml
 
 def run_etapa_7(state):
     globals().update(state)
-    X_train = state.get("X_train")
-    y_train = state.get("y_train")
-    X_test = state.get("X_test")
-    y_test = state.get("y_test")
+    df_train = state.get("df_train")
+    df_test = state.get("df_test")
+    selected_features = state.get("selected_features")
+    TARGET_CLF = state.get("TARGET_CLF")
+    X_train = df_train[selected_features].copy()
+    X_test = df_test[selected_features].copy()
+    y_train = df_train[TARGET_CLF].copy()
+    y_test = df_test[TARGET_CLF].copy()
     OUTPUT_DIR = state.get("OUTPUT_DIR")
     from sklearn.neural_network import MLPClassifier
     # ================= ETAPA 7 — Regularização e Análise de Overfitting =================

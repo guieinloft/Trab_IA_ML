@@ -21,12 +21,13 @@ from sklearn.datasets import fetch_openml
 
 def run_etapa_5(state):
     globals().update(state)
-    df = state.get("df")
+    df_train = state.get("df_train")
+    df_test = state.get("df_test")
     TARGET_REG = state.get("TARGET_REG")
-    df_pre_scaling = state.get("df_pre_scaling")
+    df_train_pre_scaling = state.get("df_train_pre_scaling")
+    df_test_pre_scaling = state.get("df_test_pre_scaling")
     OUTPUT_DIR = state.get("OUTPUT_DIR")
     import time
-    from sklearn.model_selection import train_test_split
     # ================= ETAPA 5 — Regressão com MLP =================
     print("\n" + "="*60)
     print("[INFO] Iniciando ETAPA 5 — Regressão com MLP...")
@@ -39,15 +40,15 @@ def run_etapa_5(state):
     # -------------------------------------------------------
     # Para regressão, nosso target é TARGET_REG ('plas' - Glicose).
     # Usaremos todas as outras features, incluindo TARGET_CLF ('Outcome').
-    features_reg = [c for c in df.columns if c != TARGET_REG]
-    X_reg = df[features_reg].copy()
-    # A variável alvo no 'df' está escalonada (pelo RobustScaler na Etapa 2).
+    # Usamos os splits já existentes da Etapa 1 (sem train_test_split interno).
+    features_reg = [c for c in df_train.columns if c != TARGET_REG]
+    X_train_reg = df_train[features_reg].copy()
+    X_test_reg = df_test[features_reg].copy()
+    # A variável alvo no 'df_train' está escalonada (pelo RobustScaler na Etapa 2).
     # Para interpretar os resultados (MAE, RMSE) na unidade original (mg/dL),
-    # usaremos a variável do 'df_pre_scaling' como nosso target.
-    y_reg = df_pre_scaling[TARGET_REG].copy()
-    X_train_reg, X_test_reg, y_train_reg, y_test_reg = train_test_split(
-        X_reg, y_reg, test_size=0.2, random_state=42
-    )
+    # usaremos a variável do 'df_*_pre_scaling' como nosso target.
+    y_train_reg = df_train_pre_scaling[TARGET_REG].copy()
+    y_test_reg = df_test_pre_scaling[TARGET_REG].copy()
     # -------------------------------------------------------
     # 5.2 Definição e treinamento da MLP de Regressão
     print("  -> Executando passo: 5.2 Definição e treinamento da MLP de Regressão")
